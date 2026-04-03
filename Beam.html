@@ -1074,7 +1074,10 @@ emoji-picker{--background:var(--surface);--border-color:var(--bdr);width:286px;h
 let CU=localStorage.getItem('beam_u')||'Player_'+Math.floor(Math.random()*9000+1000);
 let aCv='global',mH={},aCts=new Set(),grps={},rCh=new Set(),friends=new Set();
 const HTL=24*3600*1000,MX=150;
-let skt,pvV='home',rp=JSON.parse(localStorage.getItem('beam_rp')||'[]');
+let skt,pvV='home';
+// rp items stored as {name,icon,bg,type,url?,key?} — no function strings
+let rp=[];
+try{const _r=JSON.parse(localStorage.getItem('beam_rp')||'[]');rp=Array.isArray(_r)?_r:[];}catch(e){rp=[];}
 
 /* ─── CURSOR GLOW ───────────────────────────── */
 document.addEventListener('mousemove',e=>{
@@ -1231,22 +1234,35 @@ function renderFr(){
 }
 
 /* ─── RECENT PLAYED ─────────────────────────── */
-function addRp(name,icon,bg,action){rp=rp.filter(r=>r.name!==name);rp.unshift({name,icon,bg,action});if(rp.length>6)rp.pop();localStorage.setItem('beam_rp',JSON.stringify(rp));renderRp();}
+function addRp(name,icon,bg,action){
+  rp=rp.filter(r=>r.name!==name);
+  rp.unshift({name,icon,bg,...action});
+  if(rp.length>6)rp.pop();
+  localStorage.setItem('beam_rp',JSON.stringify(rp));
+  renderRp();
+}
+function rpLaunch(i){
+  const r=rp[i];if(!r)return;
+  if(r.type==='game')launchGO(r.url,r.name,r.icon,r.bg);
+  else if(r.type==='proxy')launchProxy(r.name,r.url);
+  else if(r.type==='mc')launchMC(r.key);
+  else if(r.type==='orion')launchOrion();
+}
 function renderRp(){
   const area=document.getElementById('cp-area');if(!area)return;
   if(!rp.length){area.innerHTML=`<div class="cp-empty"><div class="cp-empty-ico">🎮</div><div class="cp-empty-t">Nothing here yet</div><div class="cp-empty-s">Your recently played games will appear here</div></div>`;return;}
   let html='<div class="gc-grid" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr));">';
-  rp.forEach(r=>{html+=`<div class="gc tilt" onclick='(${r.action})()'><div class="gc-thumb"><div class="gc-emoji" style="background:${r.bg};">${r.icon}</div><div class="gc-shade"></div></div><div class="gc-body"><div class="gc-name">${r.name}</div><button class="play-btn">Continue</button></div></div>`;});
+  rp.forEach((r,i)=>{html+=`<div class="gc tilt" onclick="rpLaunch(${i})"><div class="gc-thumb"><div class="gc-emoji" style="background:${r.bg};">${r.icon}</div><div class="gc-shade"></div></div><div class="gc-body"><div class="gc-name">${r.name}</div><button class="play-btn">Continue</button></div></div>`;});
   html+='</div>';area.innerHTML=html;setTimeout(initTilt,100);
 }
 
 /* ─── GAME LAUNCH ───────────────────────────── */
 function launchGO(url,name,icon,bg){
   const ei=icon||'🎮',ebg=bg||'#0f172a';
-  addRp(name||url,ei,ebg,`()=>launchGO('${url.replace(/'/g,"\\'").replace(/\\/g,"\\\\")}','${(name||url).replace(/'/g,"\\'")}','${ei}','${ebg}')`);
+  addRp(name||url,ei,ebg,{type:'game',url,name:name||url,icon:ei,bg:ebg});
   _frame(url,name||url);
 }
-function launchProxy(n,url){addRp(n,'🌐','linear-gradient(135deg,#1e3a8a,#1e40af)',`()=>launchProxy('${n.replace(/'/g,"\\'")}','${url}')`);_frame(url,n);}
+function launchProxy(n,url){addRp(n,'🌐','linear-gradient(135deg,#1e3a8a,#1e40af)',{type:'proxy',name:n,url});_frame(url,n);}
 function _frame(url,title){
   document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.display='';});
   const v=document.getElementById('gf-view');v.style.display='flex';v.classList.add('on');
@@ -1258,7 +1274,7 @@ function _frame(url,title){
   const fr=document.createElement('iframe');fr.style.cssText='width:100%;height:100%;border:none;position:absolute;inset:0;';fr.allow='fullscreen;autoplay;camera;microphone';fr.src=url;c.appendChild(fr);
 }
 function launchOrion(){
-  addRp('ORION','☄️','#030510',`()=>launchOrion()`);
+  addRp('ORION','☄️','#030510',{type:'orion'});
   fetch("https://cdn.jsdelivr.net/gh/Wakefield-coolbean/Orion-Games@latest/Index18.html?v="+Date.now()).then(r=>r.text()).then(h=>{const w=window.open('about:blank','_blank');if(w){w.document.open();w.document.write(h);w.document.close();}}).catch(()=>toast('Could not load ORION','error'));
 }
 function closeGF(){document.getElementById('gf-cont').innerHTML='';nav(pvV||'home');}
@@ -1266,7 +1282,7 @@ function closeGF(){document.getElementById('gf-cont').innerHTML='';nav(pvV||'hom
 /* ─── MINECRAFT ─────────────────────────────── */
 const MC={resent:{t:'RESENT CLIENT',u:'https://raw.githubusercontent.com/VentisAzar/testing/refs/heads/main/Resent%20Client.html'},tuff:{t:'TUFF CLIENT',u:'https://raw.githubusercontent.com/VentisAzar/testing/refs/heads/main/Tuff%20Client.html'},explore:{t:'EAGLERCRAFT EXPLORE',u:'https://raw.githubusercontent.com/VentisAzar/testing/refs/heads/main/Eaglercraft_WASM-GC_JSPI_Offline_Explore.html'},skyfactory:{t:'SKYFACTORY',u:'https://raw.githubusercontent.com/VentisAzar/testing/refs/heads/main/Eaglercraft_WASM-GC_JSPI_Offline_Skyfactory.html'},tech:{t:'TECH MOD',u:'https://raw.githubusercontent.com/VentisAzar/testing/refs/heads/main/Eaglercraft_WASM-GC_JSPI_Offline_Tech.html'},ultimate:{t:'ULTIMATE MOD',u:'https://raw.githubusercontent.com/VentisAzar/testing/refs/heads/main/Eaglercraft_WASM-GC_JSPI_Offline_Ultimate.html'},vanilla:{t:'EAGLER+ VANILLA',u:'https://raw.githubusercontent.com/VentisAzar/testing/refs/heads/main/Eaglercraft_WASM-GC_JSPI_Offline_Vanilla.html'}};
 function launchMC(k){
-  const c=MC[k];if(!c)return;addRp(c.t,'⛏️','#0f172a',`()=>launchMC('${k}')`);
+  const c=MC[k];if(!c)return;addRp(c.t,'⛏️','#0f172a',{type:'mc',key:k});
   document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.display='';});
   const v=document.getElementById('gf-view');v.style.display='flex';v.classList.add('on');
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
@@ -1308,7 +1324,10 @@ function runInj(){
 }
 
 /* ─── CHAT ──────────────────────────────────── */
+function saveGrps(){localStorage.setItem('beam_grps',JSON.stringify(grps));}
 function initChat(){
+  // restore saved group names (fix: GC name lost on refresh)
+  try{const sg=localStorage.getItem('beam_grps');if(sg)grps=JSON.parse(sg);}catch(e){}
   try{const s=localStorage.getItem('beam_chat');if(s){const p=JSON.parse(s);const now=Date.now();Object.keys(p).forEach(k=>{p[k]=p[k].filter(m=>m.ts&&(now-m.ts)<HTL);if(k!=='global'&&p[k].length>0){aCts.add(k);if(!k.startsWith('grp_'))addFr(k);}});mH=p;}}catch(e){}
   renderCts();
   if(!skt){
@@ -1326,8 +1345,18 @@ function initChat(){
 }
 function openDM(u){nav('chat');setTimeout(()=>selCv(u),50);}
 function handleIn(d){let c='global';if(d.target)c=(d.target===CU)?d.user:d.target;if(c!=='global'&&!c.startsWith('grp_'))addFr(c);procM(c,d);}
-function handleGrp(d){const m=d.text.match(/^\|\|GRP:(.*?):(.*?):(.*?)\|\| (.*)/s);if(!m)return;const[_,gid,gn,gm,tx]=m;if(!grps[gid]){grps[gid]={id:gid,name:gn,members:gm.split(',')};aCts.add(gid);renderCts();}procM(gid,{...d,text:tx});}
-function procM(id,d){if(!mH[id])mH[id]=[];d.ts=Date.now();mH[id].push(d);if(mH[id].length>MX)mH[id]=mH[id].slice(-MX);localStorage.setItem('beam_chat',JSON.stringify(mH));if(id!=='global'&&!aCts.has(id)){aCts.add(id);renderCts();}if(aCv===id)appendM(d,d.user===CU);}
+function handleGrp(d){const m=d.text.match(/^\|\|GRP:(.*?):(.*?):(.*?)\|\| (.*)/s);if(!m)return;const[_,gid,gn,gm,tx]=m;if(!grps[gid]){grps[gid]={id:gid,name:gn,members:gm.split(',')};saveGrps();aCts.add(gid);renderCts();}procM(gid,{...d,text:tx});}
+function procM(id,d){
+  if(!mH[id])mH[id]=[];
+  // dedup: if message has a mid already in history, skip (fixes group chat duplication)
+  if(d.mid&&mH[id].some(m=>m.mid===d.mid))return;
+  d.ts=Date.now();
+  mH[id].push(d);
+  if(mH[id].length>MX)mH[id]=mH[id].slice(-MX);
+  localStorage.setItem('beam_chat',JSON.stringify(mH));
+  if(id!=='global'&&!aCts.has(id)){aCts.add(id);renderCts();}
+  if(aCv===id)appendM(d,d.user===CU);
+}
 function renderCts(){
   const l=document.getElementById('ch-cl');if(!l)return;const a=aCv;
   l.innerHTML=`<div class="cct ${a==='global'?'on':''}" onclick="selCv('global')"><i class="fa-solid fa-earth-americas" style="color:var(--amber);font-size:10px;"></i>ChatRoom</div>`;
@@ -1342,8 +1371,20 @@ function selCv(id){
 function sendMsg(){
   const inp=document.getElementById('msg-in');const tx=inp.value.trim();if(!tx)return;
   const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  if(grps[aCv]){const g=grps[aCv];const pr=`||GRP:${g.id}:${g.name}:${g.members.join(',')}|| ${tx}`;g.members.forEach(m=>{if(m!==CU)skt.emit('chat message',{user:CU,text:pr,target:m,timestamp:t});});procM(aCv,{user:CU,text:tx,timestamp:t});}
-  else{const p={user:CU,text:tx,timestamp:t};if(aCv!=='global'){p.target=aCv;addFr(aCv);}skt.emit('chat message',p);if(aCv!=='global')procM(aCv,p);}
+  const mid=CU+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
+  if(grps[aCv]){
+    const g=grps[aCv];
+    const pr=`||GRP:${g.id}:${g.name}:${g.members.join(',')}|| ${tx}`;
+    g.members.forEach(m=>{if(m!==CU)skt.emit('chat message',{user:CU,text:pr,target:m,timestamp:t,mid});});
+    // add locally once with the mid so any echo is deduped
+    procM(aCv,{user:CU,text:tx,timestamp:t,mid});
+  } else {
+    const p={user:CU,text:tx,timestamp:t,mid};
+    if(aCv!=='global'){p.target=aCv;addFr(aCv);}
+    skt.emit('chat message',p);
+    // for global, let socket echo handle it; for DMs add locally
+    if(aCv!=='global')procM(aCv,p);
+  }
   inp.value='';
 }
 function appendM(d,isMe){
@@ -1356,7 +1397,15 @@ function appendM(d,isMe){
 function pruneM(){const now=Date.now();Object.keys(mH).forEach(k=>{mH[k]=mH[k].filter(m=>m.ts&&(now-m.ts)<HTL);});localStorage.setItem('beam_chat',JSON.stringify(mH));}
 function openGM(){document.getElementById('gm').classList.add('open');const l=document.getElementById('ul');l.innerHTML='';rCh.forEach(u=>{if(u!==CU)l.innerHTML+=`<div style="padding:8px 10px;cursor:pointer;border-radius:7px;font-size:12.5px;font-weight:500;color:var(--t2);display:flex;align-items:center;gap:9px;transition:background var(--t-fast);" onclick="this.querySelector('i').className=this.querySelector('i').className.includes('check')?'fa-regular fa-circle':'fa-solid fa-circle-check';this.classList.toggle('sl');" onmouseover="this.style.background='var(--amber-aa)'" onmouseout="this.style.background=''"><i class="fa-regular fa-circle" style="color:var(--t3);font-size:11px;"></i>${u}</div>`;});}
 function closeGM(){document.getElementById('gm').classList.remove('open');}
-function mkGrp(){const name=document.getElementById('gn-in').value||'New Group';const sl=Array.from(document.querySelectorAll('#ul .sl')).map(el=>el.textContent.trim().replace(/[^\w\s]/g,'').trim()).filter(Boolean);const mb=[CU,...sl];if(mb.length<2){toast('Pick at least 1 user.','error');return;}const gid='grp_'+Date.now();grps[gid]={id:gid,name,members:mb};aCts.add(gid);renderCts();closeGM();}
+function mkGrp(){
+  const name=document.getElementById('gn-in').value||'New Group';
+  const sl=Array.from(document.querySelectorAll('#ul .sl')).map(el=>el.textContent.trim().replace(/[^\w\s]/g,'').trim()).filter(Boolean);
+  const mb=[CU,...sl];if(mb.length<2){toast('Pick at least 1 user.','error');return;}
+  const gid='grp_'+Date.now();
+  grps[gid]={id:gid,name,members:mb};
+  saveGrps(); // persist group name
+  aCts.add(gid);renderCts();closeGM();
+}
 function openIM(s){document.getElementById('im-src').src=s;document.getElementById('im').classList.add('open');}
 function closeIM(){document.getElementById('im').classList.remove('open');}
 function initPickers(){
